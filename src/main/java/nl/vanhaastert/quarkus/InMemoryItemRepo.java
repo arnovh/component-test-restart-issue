@@ -1,51 +1,46 @@
 package nl.vanhaastert.quarkus;
 
 import jakarta.enterprise.context.ApplicationScoped;
-import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.ConcurrentHashMap;
 
 
 @ApplicationScoped
-public class InMemoryRepo {
+public class InMemoryItemRepo {
 
-  private final AtomicLong ids = new AtomicLong(0);
-  private final List<String> store = new CopyOnWriteArrayList<>();
+  private final static String NOT_FOUND_TMPL = "Item with name %s not found";
+  private final static String ALREADY_EXISTS_TMPL =
+      "Item with name %s already exists";
+
+  private final ConcurrentHashMap<String, Item> store = new ConcurrentHashMap<>();
 
 
-  @Override
-  public String save(Reservation reservation) {
-    Objects.requireNonNull(reservation);
-    if (reservation.getId() != null) {
-      throw new IllegalArgumentException("Reservation with an id cannot be saved");
+  public Item findByName(String name) {
+    Item item = (name == null ? null : store.get(name));
+    if (item == null) {
+      final String msg = String.format(NOT_FOUND_TMPL, name);
+      throw new IllegalArgumentException(msg);
     }
-
-    reservation.setId(ids.incrementAndGet());
-    store.add(reservation);
-    return reservation;
+    return item;
   }
 
-  public static class Item {
-
-    private long id;
-
-    private String name;
-
-    public long getId() {
-      return id;
+  public void save(final Item item) {
+    Objects.requireNonNull(item);
+    if (store.containsKey(item.getName())) {
+      final String msg = String.format(ALREADY_EXISTS_TMPL, item.getName());
+      throw new IllegalArgumentException(msg);
     }
 
-    public void setId(long id) {
-      this.id = id;
-    }
+    store.put(item.getName(), item);
+  }
 
-    public String getName() {
-      return name;
-    }
-
-    public void setName(String name) {
-      this.name = name;
+  public void remove(final Item item) {
+    Objects.requireNonNull(item);
+    final Item itemFound = store.remove(item.getName());
+    if (itemFound == null) {
+      final String msg = String.format(NOT_FOUND_TMPL, item.getName());
+      throw new IllegalArgumentException(msg);
     }
   }
 }
+
